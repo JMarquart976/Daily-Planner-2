@@ -1,0 +1,2252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#dbeafe" />
+  <title>Daily Planner</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      /* Soothing light-to-medium blue palette */
+      --bg: #e8f1fb;
+      --surface: #ffffff;
+      --surface2: #dbeafe;
+      --border: #bfdbfe;
+      --text: #1e3a5f;
+      --text-muted: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --accent-soft: #93c5fd;
+      --work: #3b82f6;
+      --personal: #0ea5e9;
+      --calendar: #6366f1;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --completed-bg: #f1f5f9;
+      --completed-text: #94a3b8;
+      --radius: 12px;
+      --shadow: 0 2px 12px rgba(59, 130, 246, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px;
+      padding-bottom: 100px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .date-nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .date-nav button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow);
+    }
+    .date-nav button:active { background: var(--surface2); }
+
+    .date-display {
+      font-size: 1.25rem;
+      font-weight: 650;
+      min-width: 230px;
+      text-align: center;
+      color: var(--text);
+    }
+    .date-display .weekday {
+      color: var(--accent);
+      font-size: 0.88rem;
+      font-weight: 500;
+      display: block;
+    }
+    .date-display .clock {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 560;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+    }
+    .btn:active { background: var(--accent-hover); }
+    .btn.secondary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      box-shadow: var(--shadow);
+    }
+    .btn.secondary:active { background: var(--surface2); }
+    .btn.success { background: var(--success); box-shadow: none; }
+    .btn.warning { background: #f59e0b; color: #fff; box-shadow: none; }
+    .btn.calendar { background: var(--calendar); box-shadow: none; }
+
+    .totals-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+      font-size: 0.88rem;
+    }
+    .total-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: var(--shadow);
+    }
+    .total-chip strong { color: var(--accent); }
+    .total-chip.over { border-color: #fca5a5; background: #fef2f2; }
+    .total-chip.over strong { color: var(--danger); }
+
+    .structure {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .structure h2 {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .blocks {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 7px;
+    }
+    .block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 0.84rem;
+    }
+    .block .time { color: var(--accent); font-weight: 600; font-size: 0.78rem; }
+    .block .label { margin-top: 2px; color: var(--text); }
+    .block .capacity {
+      margin-top: 3px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .block.highlight { border-color: #fcd34d; background: #fffbeb; }
+    .block.leave { border-color: #fca5a5; background: #fef2f2; }
+    .block.deep { border-color: var(--accent-soft); background: #eff6ff; }
+
+    .columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .columns { grid-template-columns: 1fr; }
+    }
+
+    .section {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-height: 260px;
+    }
+    .section.work { border-top: 3px solid var(--work); }
+    .section.personal { border-top: 3px solid var(--personal); }
+    .section.calendar { border-top: 3px solid var(--calendar); }
+    .project-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .project-card h3 {
+      font-size: 1.05rem;
+      color: #6d28d9;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .project-card .deadline {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .project-card .deadline.urgent { color: #b45309; font-weight: 600; }
+    .project-task {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.92rem;
+    }
+    .project-task:last-child { border-bottom: none; }
+    .project-task.done { opacity: 0.55; text-decoration: line-through; }
+    .project-task .pt-est { color: var(--text-muted); font-size: 0.8rem; min-width: 40px; }
+    .project-task .pt-date { color: #6d28d9; font-size: 0.78rem; background: #f3e8ff; padding: 2px 6px; border-radius: 6px; }
+    .project-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .project-actions .btn { font-size: 0.85rem; padding: 8px 12px; }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .section-header h2 { font-size: 1.08rem; font-weight: 650; }
+    .section.work .section-header h2 { color: #1d4ed8; }
+    .section.personal .section-header h2 { color: #0369a1; }
+    .section.calendar .section-header h2 { color: #4338ca; }
+
+    .count {
+      background: var(--bg);
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      padding: 3px 9px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+
+    .quick-add {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .quick-add-row {
+      display: flex;
+      gap: 8px;
+    }
+    .quick-add input[type="text"],
+    .quick-add input[type="time"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 0.98rem;
+      outline: none;
+    }
+    .quick-add input[type="text"] { flex: 1; }
+    .quick-add input[type="time"] { width: 110px; }
+    .quick-add input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .quick-add input::placeholder { color: var(--text-muted); }
+
+    .estimate-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .estimate-row span {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-right: 2px;
+    }
+    .est-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+    .est-btn.active, .est-btn:active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+    .est-custom {
+      width: 58px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 5px 6px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+    .add-btn {
+      background: var(--accent);
+      border: none;
+      color: white;
+      width: 46px;
+      border-radius: 10px;
+      font-size: 1.3rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .add-btn.cal { background: var(--calendar); }
+
+    .task-list {
+      list-style: none;
+      flex: 1;
+      overflow-y: auto;
+      min-height: 50px;
+    }
+
+    .task {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 12px 10px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      background: var(--bg);
+      border: 1px solid transparent;
+      cursor: grab;
+      transition: opacity 0.15s, border-color 0.15s, background 0.15s, color 0.15s;
+      user-select: none;
+    }
+    .task:active { cursor: grabbing; }
+    .task:hover { border-color: var(--border); }
+    .task.completed {
+      background: var(--completed-bg);
+      border-color: #e2e8f0;
+    }
+    .task.completed .task-text {
+      text-decoration: line-through;
+      color: var(--completed-text);
+    }
+    .task.completed .task-meta { opacity: 0.7; }
+    .task.carried { border-left: 3px solid var(--warning); }
+    .task.from-calendar { border-left: 3px solid var(--calendar); }
+    .task.dragging {
+      opacity: 0.4;
+      border-color: var(--accent);
+      background: var(--surface2);
+    }
+    .task.drag-over {
+      border-top: 3px solid var(--accent);
+    }
+
+    .task input[type="checkbox"] {
+      width: 22px;
+      height: 22px;
+      margin-top: 3px;
+      accent-color: var(--accent);
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .task-body {
+      flex: 1;
+      min-width: 0;
+      cursor: pointer; /* tap whole body to toggle complete */
+      padding: 2px 0;
+    }
+    .task-text { font-size: 0.98rem; word-break: break-word; color: var(--text); }
+    .task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 4px;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+    .badge {
+      background: var(--surface2);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .badge.carried-badge {
+      background: #fef3c7;
+      border-color: #fcd34d;
+      color: #b45309;
+    }
+    .badge.time-badge {
+      background: #dbeafe;
+      border-color: #93c5fd;
+      color: #1d4ed8;
+    }
+    .badge.calendar-badge {
+      background: #e0e7ff;
+      border-color: #a5b4fc;
+      color: #4338ca;
+    }
+    .badge.clock-badge {
+      background: #e0e7ff;
+      border-color: #a5b4fc;
+      color: #3730a3;
+      font-weight: 600;
+    }
+
+    .drag-handle {
+      color: var(--text-muted);
+      font-size: 1rem;
+      line-height: 1;
+      padding: 4px 2px 0 0;
+      cursor: grab;
+      user-select: none;
+      opacity: 0.4;
+      display: none; /* hide on most views; show only on wider screens */
+    }
+    @media (min-width: 700px) {
+      .drag-handle { display: block; }
+      .task:hover .drag-handle { opacity: 0.85; }
+    }
+
+    .reorder-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .reorder-btns button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      width: 32px;
+      height: 26px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      line-height: 1;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .reorder-btns button:active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    .reorder-btns button:disabled {
+      opacity: 0.3;
+      pointer-events: none;
+    }
+
+    .task-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+      opacity: 0.85;
+    }
+    .task-actions button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .task-actions button:active { background: var(--surface2); color: var(--text); }
+    .task-actions button.delete:active { color: var(--danger); border-color: #fca5a5; }
+
+    .empty {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 24px 10px;
+      font-size: 0.9rem;
+    }
+
+    .day-stats {
+      margin-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
+    .schedule-panel {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-top: 16px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      display: none;
+    }
+    .schedule-panel.open { display: block; }
+    .schedule-panel h2 { font-size: 1.05rem; margin-bottom: 6px; color: var(--text); }
+    .schedule-panel .principle {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      line-height: 1.4;
+    }
+    .sched-block {
+      margin-bottom: 14px;
+      border-left: 3px solid var(--accent);
+      padding-left: 12px;
+    }
+    .sched-block.highlight { border-color: var(--warning); }
+    .sched-block h3 {
+      font-size: 0.9rem;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .sched-block.highlight h3 { color: #b45309; }
+    .sched-block ul { list-style: none; font-size: 0.9rem; }
+    .sched-block li {
+      padding: 4px 0;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--text);
+    }
+    .sched-block .mins {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+    .sched-empty {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-style: italic;
+    }
+    .overflow-warning {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-top: 10px;
+      font-size: 0.88rem;
+      color: #b91c1c;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(30, 58, 95, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 540px;
+      max-height: 90dvh;
+      overflow-y: auto;
+      padding: 22px;
+      box-shadow: 0 20px 50px rgba(30, 58, 95, 0.2);
+      border: 1px solid var(--border);
+    }
+    .modal h2 { margin-bottom: 6px; font-size: 1.25rem; color: var(--text); }
+    .modal p { color: var(--text-muted); margin-bottom: 14px; font-size: 0.92rem; }
+    .modal .carry-list { margin-bottom: 12px; }
+    .modal .carry-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px;
+      background: var(--bg);
+      border-radius: 8px;
+      margin-bottom: 5px;
+      font-size: 0.92rem;
+      border: 1px solid var(--border);
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--text);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 0.92rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 200;
+      max-width: 90vw;
+      text-align: center;
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .hint {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+      margin-bottom: 4px;
+    }
+
+    .note-box {
+      background: #eff6ff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 600px) {
+      .app { padding: 12px; padding-bottom: 120px; }
+      .date-display { font-size: 1.05rem; min-width: auto; }
+      .btn { padding: 11px 14px; font-size: 0.9rem; min-height: 44px; }
+      .date-nav button { width: 44px; height: 44px; }
+      .task {
+        padding: 14px 10px;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .task input[type="checkbox"] {
+        width: 26px;
+        height: 26px;
+        margin-top: 2px;
+      }
+      .task-text { font-size: 1.02rem; }
+      .reorder-btns button {
+        width: 36px;
+        height: 30px;
+        font-size: 0.85rem;
+      }
+      .task-actions button {
+        width: 40px;
+        height: 40px;
+        font-size: 1.05rem;
+      }
+      .est-btn {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+        min-height: 36px;
+      }
+      .add-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 1.4rem;
+      }
+      .quick-add input[type="text"] {
+        padding: 13px 14px;
+        font-size: 1.05rem;
+        min-height: 48px;
+      }
+      .quick-add input[type="time"] {
+        min-height: 48px;
+        font-size: 1rem;
+      }
+      .header-actions {
+        width: 100%;
+        justify-content: stretch;
+      }
+      .header-actions .btn {
+        flex: 1;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="date-nav">
+        <button id="prevDay" aria-label="Previous day">‹</button>
+        <div class="date-display" id="dateDisplay">
+          <span class="weekday" id="weekday">—</span>
+          <span id="fullDate">Loading…</span>
+          <div class="clock" id="clock">—</div>
+        </div>
+        <button id="nextDay" aria-label="Next day">›</button>
+      </div>
+      <div class="header-actions">
+        <button class="btn secondary" id="todayBtn">Today</button>
+        <button class="btn secondary" id="planDayBtn">Plan Day</button>
+        <button class="btn warning" id="scheduleBtn">Build Schedule</button>
+        <button class="btn" id="emailBtn">Email Plan</button>
+        <button class="btn secondary" id="syncBtn" title="Sync with other devices">Sync</button>
+      </div>
+    </header>
+
+    <div class="totals-bar" id="totalsBar">
+      <div class="total-chip">Work remaining: <strong id="workMins">0m</strong></div>
+      <div class="total-chip">Personal remaining: <strong id="personalMins">0m</strong></div>
+      <div class="total-chip" id="totalChip">Day total: <strong id="totalMins">0m</strong></div>
+    </div>
+
+    <section class="structure">
+      <h2>
+        <span>Energy-Optimized Day Structure</span>
+        <span style="font-size:0.75rem; font-weight:400; text-transform:none; letter-spacing:0;">~6.5 hrs available</span>
+      </h2>
+      <div class="blocks">
+        <div class="block deep">
+          <div class="time">Arrival – 8:30</div>
+          <div class="label">Plan + light inbox</div>
+          <div class="capacity">~20–25 min</div>
+        </div>
+        <div class="block deep">
+          <div class="time">8:30 – 11:00</div>
+          <div class="label">Deep work / MITs</div>
+          <div class="capacity">150 min · peak focus</div>
+        </div>
+        <div class="block">
+          <div class="time">11:00 – 12:00</div>
+          <div class="label">Admin / batch</div>
+          <div class="capacity">60 min</div>
+        </div>
+        <div class="block">
+          <div class="time">12:00 – 12:45</div>
+          <div class="label">Lunch</div>
+          <div class="capacity">protected</div>
+        </div>
+        <div class="block highlight">
+          <div class="time">12:45 – 1:15</div>
+          <div class="label">Read / Surf</div>
+          <div class="capacity">30 min · recharge</div>
+        </div>
+        <div class="block">
+          <div class="time">1:15 – 3:45</div>
+          <div class="label">Client work / calls</div>
+          <div class="capacity">150 min · medium</div>
+        </div>
+        <div class="block">
+          <div class="time">3:45 – 4:15</div>
+          <div class="label">Wrap + notes</div>
+          <div class="capacity">30 min</div>
+        </div>
+        <div class="block leave">
+          <div class="time">4:20</div>
+          <div class="label">Hard stop → Leave</div>
+          <div class="capacity">non-negotiable</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="columns">
+      <!-- Work & Admin -->
+      <section class="section work">
+        <div class="section-header">
+          <h2>Work & Admin</h2>
+          <span class="count" id="workCount">0</span>
+        </div>
+        <div class="quick-add">
+          <div class="quick-add-row">
+            <input type="text" id="workInput" placeholder="Add work or admin task…" autocomplete="off" />
+            <button class="add-btn" id="workAddBtn" aria-label="Add">+</button>
+          </div>
+          <div class="estimate-row" id="workEstRow">
+            <span>Est:</span>
+            <button class="est-btn" data-mins="15">15m</button>
+            <button class="est-btn" data-mins="30">30m</button>
+            <button class="est-btn active" data-mins="45">45m</button>
+            <button class="est-btn" data-mins="60">60m</button>
+            <button class="est-btn" data-mins="90">90m</button>
+            <input type="number" class="est-custom" id="workCustomEst" placeholder="min" min="5" max="240" />
+          </div>
+        </div>
+        <p class="hint">Tap task to complete · Use ▲ ▼ to reorder</p>
+        <ul class="task-list" id="workList" data-section="work"></ul>
+      </section>
+
+      <!-- Personal & Home -->
+      <section class="section personal">
+        <div class="section-header">
+          <h2>Personal & Home</h2>
+          <span class="count" id="personalCount">0</span>
+        </div>
+        <div class="quick-add">
+          <div class="quick-add-row">
+            <input type="text" id="personalInput" placeholder="Add personal or home item…" autocomplete="off" />
+            <button class="add-btn" id="personalAddBtn" aria-label="Add">+</button>
+          </div>
+          <div class="estimate-row" id="personalEstRow">
+            <span>Est:</span>
+            <button class="est-btn" data-mins="15">15m</button>
+            <button class="est-btn active" data-mins="30">30m</button>
+            <button class="est-btn" data-mins="45">45m</button>
+            <button class="est-btn" data-mins="60">60m</button>
+            <input type="number" class="est-custom" id="personalCustomEst" placeholder="min" min="5" max="240" />
+          </div>
+        </div>
+        <p class="hint">Tap task to complete · Use ▲ ▼ to reorder</p>
+        <ul class="task-list" id="personalList" data-section="personal"></ul>
+      </section>
+    </div>
+
+    <!-- Project work scheduled for the viewed day -->
+    <div id="todayProjectWork" style="display:none; margin-top:16px;"></div>
+
+    <!-- Calendar / Outlook-style items -->
+    <section class="section calendar" style="margin-top:16px;">
+      <div class="section-header">
+        <h2>Calendar / Meetings</h2>
+        <span class="count" id="calendarCount">0</span>
+      </div>
+      <div class="note-box">
+        <strong>Best workflow:</strong> Run the iOS Shortcut “Today’s Events” → it copies today’s calendar items → paste them below. 
+        They become timed “Outlook” items automatically.
+      </div>
+
+      <!-- Paste from Shortcut -->
+      <div style="margin-bottom:12px;">
+        <textarea id="pasteEvents" rows="3" placeholder="Paste events from the iOS Shortcut here…&#10;Example:&#10;9:00 AM - Client call&#10;10:30 AM - Team meeting" style="width:100%; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--bg); color:var(--text); font-size:0.95rem; resize:vertical; font-family:inherit;"></textarea>
+        <button class="btn calendar" id="parsePasteBtn" style="margin-top:8px; width:100%;">Add Pasted Events</button>
+      </div>
+
+      <div class="quick-add">
+        <div class="quick-add-row">
+          <input type="text" id="calendarInput" placeholder="Or add one meeting manually…" autocomplete="off" />
+          <input type="time" id="calendarTime" value="09:00" title="Start time" />
+          <button class="add-btn cal" id="calendarAddBtn" aria-label="Add">+</button>
+        </div>
+      </div>
+      <p class="hint">Shows time · Tap to complete · ▲ ▼ to reorder · ✕ to remove</p>
+      <ul class="task-list" id="calendarList" data-section="calendar"></ul>
+    </section>
+
+    <!-- Projects -->
+    <section class="section" style="margin-top:16px; border-top: 3px solid #8b5cf6;">
+      <div class="section-header">
+        <h2 style="color:#6d28d9;">Projects</h2>
+        <span class="count" id="projectCount">0</span>
+      </div>
+      <div class="note-box">
+        Set a completion date, break the work into tasks with time estimates, then tap <strong>Schedule on Weekends</strong>.
+        The app distributes the work across available days (preferring Saturdays & Sundays) so pieces appear on your daily plan.
+      </div>
+
+      <div class="quick-add" style="margin-bottom:14px;">
+        <div class="quick-add-row">
+          <input type="text" id="projectNameInput" placeholder="New project name (e.g. Paint guest room)…" autocomplete="off" />
+          <input type="date" id="projectDeadlineInput" style="width:150px; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:10px;" />
+          <button class="add-btn" id="projectAddBtn" style="background:#8b5cf6;" aria-label="Add project">+</button>
+        </div>
+      </div>
+
+      <div id="projectsList"></div>
+    </section>
+
+    <div class="schedule-panel" id="schedulePanel">
+      <h2>Recommended Schedule for Momentum</h2>
+      <p class="principle">
+        Built using energy and attention science: peak cognitive capacity early for your most important tasks,
+        batch admin late morning, protected recovery after lunch, medium-focus work in the afternoon,
+        and a hard close so you leave with momentum instead of unfinished residue.
+      </p>
+      <div id="scheduleContent"></div>
+    </div>
+
+    <div class="day-stats" id="dayStats">
+      <span id="progressText">0 of 0 complete</span>
+      <span id="carryNote"></span>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="planModal">
+    <div class="modal">
+      <h2>Plan Your Day</h2>
+      <p>Review carry-overs, then set estimates and build your schedule. Incomplete items from yesterday are brought forward. Completed items from prior days are cleared automatically when the day changes.</p>
+      <div id="carryContent"></div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="closePlanBtn">Close</button>
+        <button class="btn success" id="confirmCarryBtn">Bring Forward & Start</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ========== State ==========
+    let currentDate = new Date();
+    currentDate.setHours(12, 0, 0, 0);
+
+    const STORAGE_KEY = 'dailyPlanner_v3';
+    const META_KEY = 'dailyPlanner_meta_v3';
+    const PROJECTS_KEY = 'dailyPlanner_projects_v1';
+
+    // Cloud sync (optional — app always works offline)
+    const SUPABASE_URL = 'https://iqvoeljapigzpkjlsmqc.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlxdm9lbGphcGlnenBramxzbXFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzM1MzIsImV4cCI6MjEwMTM0OTUzMn0.Bl68ykH_0jugSyhOSBu8kPAMKGSg8aOWFlKthoLhA68';
+    let supabaseClient = null;
+    let cloudSaveTimer = null;
+    let isCloudBusy = false;
+
+    function initSupabase() {
+      try {
+        if (window.supabase && typeof window.supabase.createClient === 'function') {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
+      } catch (e) {
+        console.warn('Cloud unavailable', e);
+        supabaseClient = null;
+      }
+    }
+
+    function getFullState() {
+      return {
+        days: loadAll(),
+        projects: loadProjects(),
+        meta: getMeta(),
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    function applyFullState(state) {
+      if (!state) return;
+      try {
+        if (state.days) localStorage.setItem(STORAGE_KEY, JSON.stringify(state.days));
+        if (state.projects) localStorage.setItem(PROJECTS_KEY, JSON.stringify(state.projects));
+        if (state.meta) localStorage.setItem(META_KEY, JSON.stringify(state.meta));
+      } catch (e) {
+        console.warn('Apply state failed', e);
+      }
+    }
+
+    function scheduleCloudSave() {
+      if (!supabaseClient) return;
+      if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+      cloudSaveTimer = setTimeout(pushToCloud, 1000);
+    }
+
+    async function pushToCloud() {
+      if (!supabaseClient || isCloudBusy) return;
+      isCloudBusy = true;
+      try {
+        const state = getFullState();
+        const { error } = await supabaseClient
+          .from('planner_data')
+          .upsert({ id: 1, data: state, updated_at: new Date().toISOString() });
+        if (error) {
+          console.warn('Cloud save:', error.message);
+          showToast('Saved locally (cloud issue)');
+        } else {
+          showToast('Synced');
+        }
+      } catch (e) {
+        console.warn('Cloud save failed', e);
+      } finally {
+        isCloudBusy = false;
+      }
+    }
+
+    async function pullFromCloud() {
+      if (!supabaseClient) return false;
+      try {
+        const { data, error } = await supabaseClient
+          .from('planner_data')
+          .select('data')
+          .eq('id', 1)
+          .maybeSingle();
+        if (error) {
+          console.warn('Cloud load:', error.message);
+          return false;
+        }
+        if (data && data.data) {
+          applyFullState(data.data);
+          return true;
+        }
+        // First time — push local data up
+        await pushToCloud();
+        return false;
+      } catch (e) {
+        console.warn('Cloud load failed', e);
+        return false;
+      }
+    }
+
+    async function manualSync() {
+      if (!supabaseClient) {
+        initSupabase();
+      }
+      if (!supabaseClient) {
+        showToast('Cloud not available');
+        return;
+      }
+      showToast('Syncing…');
+      // Push local changes first, then pull (simple last-write-wins for personal use)
+      await pushToCloud();
+      const got = await pullFromCloud();
+      renderTasks();
+      renderProjects();
+      showToast(got ? 'Synced from cloud' : 'Synced');
+    }
+
+    let workSelectedEst = 45;
+    let personalSelectedEst = 30;
+
+    let dragSrcEl = null;
+    let dragSrcSection = null;
+
+    function dateKey(d = currentDate) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function loadAll() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+      catch { return {}; }
+    }
+
+    function saveAll(data) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      scheduleCloudSave();
+    }
+
+    function getMeta() {
+      try { return JSON.parse(localStorage.getItem(META_KEY) || '{}'); }
+      catch { return {}; }
+    }
+
+    function saveMeta(meta) {
+      localStorage.setItem(META_KEY, JSON.stringify(meta));
+      scheduleCloudSave();
+    }
+
+    function getDayData(key = dateKey()) {
+      const all = loadAll();
+      if (!all[key]) {
+        all[key] = { work: [], personal: [], calendar: [], planned: false };
+        saveAll(all);
+      }
+      // Migrate older data that may lack calendar
+      if (!all[key].calendar) all[key].calendar = [];
+      ['work', 'personal', 'calendar'].forEach(sec => {
+        (all[key][sec] || []).forEach(t => {
+          if (typeof t.estimate !== 'number') t.estimate = sec === 'calendar' ? 30 : 30;
+        });
+      });
+      return all[key];
+    }
+
+    function saveDayData(data, key = dateKey()) {
+      const all = loadAll();
+      all[key] = data;
+      saveAll(all);
+      // saveAll already schedules cloud save
+    }
+
+    function uid() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    function formatMins(m) {
+      if (!m || m <= 0) return '0m';
+      if (m < 60) return m + 'm';
+      const h = Math.floor(m / 60);
+      const mins = m % 60;
+      return mins ? `${h}h ${mins}m` : `${h}h`;
+    }
+
+    // ========== Projects ==========
+    function loadProjects() {
+      try { return JSON.parse(localStorage.getItem(PROJECTS_KEY) || '[]'); }
+      catch { return []; }
+    }
+    function saveProjects(list) {
+      localStorage.setItem(PROJECTS_KEY, JSON.stringify(list));
+      scheduleCloudSave();
+    }
+
+    function daysUntil(dateStr) {
+      const today = new Date();
+      today.setHours(12, 0, 0, 0);
+      const target = new Date(dateStr + 'T12:00:00');
+      return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+    }
+
+    function getWeekendHeavyDates(startDate, endDateStr) {
+      // Returns array of YYYY-MM-DD from tomorrow (or today) through deadline,
+      // sorted so weekends come first, then weekdays.
+      const result = [];
+      const end = new Date(endDateStr + 'T12:00:00');
+      const d = new Date(startDate);
+      d.setHours(12, 0, 0, 0);
+      // Start from today
+      while (d <= end) {
+        result.push(dateKey(d));
+        d.setDate(d.getDate() + 1);
+      }
+      // Prefer weekends: sort weekends first, preserving chronological order within groups
+      const weekends = result.filter(k => {
+        const day = new Date(k + 'T12:00:00').getDay();
+        return day === 0 || day === 6;
+      });
+      const weekdays = result.filter(k => {
+        const day = new Date(k + 'T12:00:00').getDay();
+        return day !== 0 && day !== 6;
+      });
+      return [...weekends, ...weekdays];
+    }
+
+    function scheduleProject(projectId) {
+      const projects = loadProjects();
+      const project = projects.find(p => p.id === projectId);
+      if (!project) return;
+      if (!project.deadline) {
+        showToast('Set a deadline first');
+        return;
+      }
+
+      const openTasks = (project.tasks || []).filter(t => !t.completed && !t.plannedDate);
+      if (!openTasks.length) {
+        showToast('No unscheduled tasks left');
+        return;
+      }
+
+      // Sort tasks largest first so bigger chunks land on weekends
+      openTasks.sort((a, b) => (b.estimate || 30) - (a.estimate || 30));
+
+      const dates = getWeekendHeavyDates(new Date(), project.deadline);
+      if (!dates.length) {
+        showToast('Deadline is in the past');
+        return;
+      }
+
+      // Soft capacity: weekends 4 hours, weekdays 1 hour of project work
+      const capacity = {};
+      dates.forEach(k => {
+        const day = new Date(k + 'T12:00:00').getDay();
+        capacity[k] = (day === 0 || day === 6) ? 240 : 60;
+      });
+
+      // Account for already scheduled project work on those days
+      projects.forEach(p => {
+        (p.tasks || []).forEach(t => {
+          if (t.plannedDate && capacity[t.plannedDate] != null && !t.completed) {
+            capacity[t.plannedDate] -= (t.estimate || 30);
+          }
+        });
+      });
+
+      let scheduled = 0;
+      openTasks.forEach(task => {
+        const need = task.estimate || 30;
+        // Find first date with enough remaining capacity
+        const slot = dates.find(k => capacity[k] >= need);
+        if (slot) {
+          task.plannedDate = slot;
+          capacity[slot] -= need;
+          scheduled++;
+        } else {
+          // Fallback: put on the last available day even if over
+          const last = dates[dates.length - 1];
+          task.plannedDate = last;
+          scheduled++;
+        }
+      });
+
+      saveProjects(projects);
+      renderProjects();
+      renderTasks(); // in case today received some
+      showToast(`Scheduled ${scheduled} task${scheduled > 1 ? 's' : ''} (weekends preferred)`);
+    }
+
+    function renderProjects() {
+      const list = loadProjects();
+      const container = document.getElementById('projectsList');
+      document.getElementById('projectCount').textContent = list.filter(p => {
+        return (p.tasks || []).some(t => !t.completed);
+      }).length;
+
+      if (!list.length) {
+        container.innerHTML = `<div class="empty">No projects yet. Add one above with a target date.</div>`;
+        return;
+      }
+
+      // Sort by deadline ascending
+      list.sort((a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999'));
+
+      container.innerHTML = list.map(p => {
+        const days = p.deadline ? daysUntil(p.deadline) : null;
+        const urgent = days !== null && days <= 7;
+        const openCount = (p.tasks || []).filter(t => !t.completed).length;
+        const totalEst = (p.tasks || []).filter(t => !t.completed).reduce((s, t) => s + (t.estimate || 0), 0);
+
+        const tasksHtml = (p.tasks || []).map(t => {
+          const dateLabel = t.plannedDate
+            ? `<span class="pt-date">${t.plannedDate.slice(5)}${isWeekend(t.plannedDate) ? ' (WE)' : ''}</span>`
+            : `<span class="pt-date" style="background:#f1f5f9;color:var(--text-muted);">unscheduled</span>`;
+          return `<div class="project-task ${t.completed ? 'done' : ''}" data-pid="${p.id}" data-tid="${t.id}">
+            <input type="checkbox" ${t.completed ? 'checked' : ''} class="pt-check" />
+            <span style="flex:1;">${escapeHtml(t.text)}</span>
+            <span class="pt-est">${formatMins(t.estimate || 30)}</span>
+            ${dateLabel}
+            <button class="pt-del" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;" title="Remove">✕</button>
+          </div>`;
+        }).join('');
+
+        return `<div class="project-card" data-id="${p.id}">
+          <h3>
+            <span>${escapeHtml(p.name)}</span>
+            <button class="proj-del" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;" title="Delete project">✕</button>
+          </h3>
+          <div class="deadline ${urgent ? 'urgent' : ''}">
+            ${p.deadline ? `Target: ${p.deadline}${days !== null ? ` · ${days} day${days !== 1 ? 's' : ''} left` : ''}` : 'No deadline set'}
+            ${openCount ? ` · ${openCount} open · ${formatMins(totalEst)}` : ' · all done'}
+          </div>
+          <div class="project-tasks">${tasksHtml || '<div class="empty" style="padding:8px 0;">No tasks yet</div>'}</div>
+          <div class="quick-add-row" style="margin-top:10px; gap:8px;">
+            <input type="text" class="pt-input" placeholder="Add task…" data-pid="${p.id}" style="flex:1; background:var(--surface); border:1px solid var(--border); color:var(--text); padding:9px 12px; border-radius:8px;" />
+            <select class="pt-est-select" data-pid="${p.id}" style="background:var(--surface); border:1px solid var(--border); color:var(--text); padding:9px; border-radius:8px;">
+              <option value="30">30m</option>
+              <option value="60" selected>60m</option>
+              <option value="90">90m</option>
+              <option value="120">2h</option>
+              <option value="180">3h</option>
+              <option value="240">4h</option>
+            </select>
+            <button class="pt-add-btn" data-pid="${p.id}" style="background:#8b5cf6; color:white; border:none; width:40px; border-radius:8px; font-size:1.2rem; cursor:pointer;">+</button>
+          </div>
+          <div class="project-actions">
+            <button class="btn" style="background:#8b5cf6;" data-schedule="${p.id}">Schedule on Weekends</button>
+            <button class="btn secondary" data-clear-sched="${p.id}">Clear schedule</button>
+          </div>
+        </div>`;
+      }).join('');
+
+      // Wire events
+      container.querySelectorAll('.pt-check').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const row = e.target.closest('.project-task');
+          const projects = loadProjects();
+          const p = projects.find(x => x.id === row.dataset.pid);
+          const t = p && p.tasks.find(x => x.id === row.dataset.tid);
+          if (t) {
+            t.completed = e.target.checked;
+            saveProjects(projects);
+            renderProjects();
+            renderTasks();
+          }
+        });
+      });
+      container.querySelectorAll('.pt-del').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const row = e.target.closest('.project-task');
+          const projects = loadProjects();
+          const p = projects.find(x => x.id === row.dataset.pid);
+          if (p) {
+            p.tasks = p.tasks.filter(x => x.id !== row.dataset.tid);
+            saveProjects(projects);
+            renderProjects();
+            renderTasks();
+          }
+        });
+      });
+      container.querySelectorAll('.proj-del').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          if (!confirm('Delete this entire project?')) return;
+          const card = e.target.closest('.project-card');
+          let projects = loadProjects().filter(x => x.id !== card.dataset.id);
+          saveProjects(projects);
+          renderProjects();
+          renderTasks();
+        });
+      });
+      container.querySelectorAll('.pt-add-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const pid = btn.dataset.pid;
+          const input = container.querySelector(`.pt-input[data-pid="${pid}"]`);
+          const sel = container.querySelector(`.pt-est-select[data-pid="${pid}"]`);
+          const text = input.value.trim();
+          if (!text) return;
+          const projects = loadProjects();
+          const p = projects.find(x => x.id === pid);
+          if (p) {
+            p.tasks.push({
+              id: uid(),
+              text,
+              estimate: parseInt(sel.value, 10) || 60,
+              completed: false,
+              plannedDate: null
+            });
+            saveProjects(projects);
+            input.value = '';
+            renderProjects();
+          }
+        });
+      });
+      container.querySelectorAll('.pt-input').forEach(input => {
+        input.addEventListener('keydown', e => {
+          if (e.key === 'Enter') {
+            const btn = container.querySelector(`.pt-add-btn[data-pid="${input.dataset.pid}"]`);
+            if (btn) btn.click();
+          }
+        });
+      });
+      container.querySelectorAll('[data-schedule]').forEach(btn => {
+        btn.addEventListener('click', () => scheduleProject(btn.dataset.schedule));
+      });
+      container.querySelectorAll('[data-clear-sched]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const projects = loadProjects();
+          const p = projects.find(x => x.id === btn.dataset.clearSched);
+          if (p) {
+            p.tasks.forEach(t => { t.plannedDate = null; });
+            saveProjects(projects);
+            renderProjects();
+            renderTasks();
+            showToast('Schedule cleared');
+          }
+        });
+      });
+    }
+
+    function isWeekend(dateStr) {
+      const day = new Date(dateStr + 'T12:00:00').getDay();
+      return day === 0 || day === 6;
+    }
+
+    function getProjectTasksForDate(key = dateKey()) {
+      const projects = loadProjects();
+      const result = [];
+      projects.forEach(p => {
+        (p.tasks || []).forEach(t => {
+          if (t.plannedDate === key && !t.completed) {
+            result.push({
+              ...t,
+              projectName: p.name,
+              projectId: p.id
+            });
+          }
+        });
+      });
+      return result;
+    }
+
+    function formatTime12(t) {
+      // t is "HH:MM"
+      if (!t) return '';
+      const [h, m] = t.split(':').map(Number);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+    }
+
+    // ========== Day rollover (simulates midnight cleanup) ==========
+    function performDayRollover() {
+      const meta = getMeta();
+      const today = dateKey(new Date());
+      const last = meta.lastOpenDate;
+
+      if (last && last !== today) {
+        const all = loadAll();
+        // For every past day: drop completed items; leave incompletes (they can still be carried)
+        Object.keys(all).forEach(key => {
+          if (key < today) {
+            ['work', 'personal', 'calendar'].forEach(sec => {
+              if (all[key][sec]) {
+                all[key][sec] = all[key][sec].filter(t => !t.completed);
+              }
+            });
+          }
+        });
+        saveAll(all);
+        meta.lastOpenDate = today;
+        saveMeta(meta);
+        return true; // rollover happened
+      }
+
+      if (!last) {
+        meta.lastOpenDate = today;
+        saveMeta(meta);
+      }
+      return false;
+    }
+
+    // ========== UI Helpers ==========
+    function formatDisplayDate(d) {
+      const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      document.getElementById('weekday').textContent = weekdays[d.getDay()];
+      document.getElementById('fullDate').textContent = `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+      updateClock();
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const opts = { hour: 'numeric', minute: '2-digit', hour12: true };
+      document.getElementById('clock').textContent = now.toLocaleTimeString(undefined, opts);
+    }
+
+    function showToast(msg, ms = 2400) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), ms);
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ========== Render ==========
+    function renderTasks() {
+      const data = getDayData();
+      const sections = [
+        { key: 'work', listId: 'workList', countId: 'workCount' },
+        { key: 'personal', listId: 'personalList', countId: 'personalCount' },
+        { key: 'calendar', listId: 'calendarList', countId: 'calendarCount' }
+      ];
+
+      sections.forEach(({ key, listId, countId }) => {
+        const listEl = document.getElementById(listId);
+        const items = data[key] || [];
+        listEl.innerHTML = '';
+
+        if (!items.length) {
+          listEl.innerHTML = `<li class="empty">No items yet.</li>`;
+        } else {
+          items.forEach(task => {
+            const li = document.createElement('li');
+            let cls = 'task';
+            if (task.completed) cls += ' completed';
+            if (task.carried) cls += ' carried';
+            if (task.source === 'outlook' || key === 'calendar') cls += ' from-calendar';
+            li.className = cls;
+            li.dataset.id = task.id;
+            li.dataset.section = key;
+            li.draggable = true;
+
+            const meta = [];
+            if (task.carried) meta.push(`<span class="badge carried-badge">From yesterday</span>`);
+            if (task.source === 'outlook' || key === 'calendar') {
+              meta.push(`<span class="badge calendar-badge">Outlook</span>`);
+            }
+            if (task.time) {
+              meta.push(`<span class="badge clock-badge">${formatTime12(task.time)}</span>`);
+            }
+            if (task.estimate && key !== 'calendar') {
+              meta.push(`<span class="badge time-badge">${formatMins(task.estimate)}</span>`);
+            }
+
+            const idx = items.indexOf(task);
+            const isFirst = idx === 0;
+            const isLast = idx === items.length - 1;
+
+            li.innerHTML = `
+              <span class="drag-handle" title="Drag to reorder">⠿</span>
+              <input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Complete" />
+              <div class="task-body">
+                <div class="task-text">${escapeHtml(task.text)}</div>
+                ${meta.length ? `<div class="task-meta">${meta.join('')}</div>` : ''}
+              </div>
+              <div class="reorder-btns">
+                <button class="move-up" title="Move up" aria-label="Move up" ${isFirst ? 'disabled' : ''}>▲</button>
+                <button class="move-down" title="Move down" aria-label="Move down" ${isLast ? 'disabled' : ''}>▼</button>
+              </div>
+              <div class="task-actions">
+                ${key !== 'calendar' ? '<button class="edit-est" title="Change estimate" aria-label="Edit time">⏱</button>' : ''}
+                <button class="delete" title="Delete" aria-label="Delete">✕</button>
+              </div>
+            `;
+
+            // Toggle complete via checkbox
+            const cb = li.querySelector('input[type="checkbox"]');
+            cb.addEventListener('change', (e) => {
+              e.stopPropagation();
+              task.completed = cb.checked;
+              saveDayData(data);
+              renderTasks();
+            });
+
+            // Tap body text area to toggle complete
+            li.querySelector('.task-body').addEventListener('click', (e) => {
+              e.stopPropagation();
+              task.completed = !task.completed;
+              saveDayData(data);
+              renderTasks();
+            });
+
+            // Move up / down
+            li.querySelector('.move-up').addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (idx > 0) {
+                const list = data[key];
+                [list[idx - 1], list[idx]] = [list[idx], list[idx - 1]];
+                saveDayData(data);
+                renderTasks();
+              }
+            });
+            li.querySelector('.move-down').addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (idx < items.length - 1) {
+                const list = data[key];
+                [list[idx], list[idx + 1]] = [list[idx + 1], list[idx]];
+                saveDayData(data);
+                renderTasks();
+              }
+            });
+
+            // Delete
+            li.querySelector('.delete').addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (confirm('Remove this item from the list?')) {
+                data[key] = data[key].filter(t => t.id !== task.id);
+                saveDayData(data);
+                renderTasks();
+                showToast('Removed');
+              }
+            });
+
+            // Edit estimate (work/personal only)
+            const estBtn = li.querySelector('.edit-est');
+            if (estBtn) {
+              estBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const val = prompt('Estimated minutes for this task:', task.estimate || 30);
+                if (val !== null) {
+                  const n = parseInt(val, 10);
+                  if (!isNaN(n) && n > 0 && n <= 480) {
+                    task.estimate = n;
+                    saveDayData(data);
+                    renderTasks();
+                    showToast('Estimate updated');
+                  }
+                }
+              });
+            }
+
+            // Drag
+            li.addEventListener('dragstart', handleDragStart);
+            li.addEventListener('dragover', handleDragOver);
+            li.addEventListener('dragenter', handleDragEnter);
+            li.addEventListener('dragleave', handleDragLeave);
+            li.addEventListener('drop', handleDrop);
+            li.addEventListener('dragend', handleDragEnd);
+
+            listEl.appendChild(li);
+          });
+        }
+
+        document.getElementById(countId).textContent = items.filter(t => !t.completed).length;
+      });
+
+      // Show project tasks planned for this date
+      const projBox = document.getElementById('todayProjectWork');
+      const projTasks = getProjectTasksForDate(dateKey());
+      if (projTasks.length) {
+        projBox.style.display = 'block';
+        projBox.innerHTML = `
+          <section class="section" style="border-top: 3px solid #8b5cf6;">
+            <div class="section-header">
+              <h2 style="color:#6d28d9;">Project Work Today</h2>
+              <span class="count">${projTasks.length}</span>
+            </div>
+            <ul class="task-list">
+              ${projTasks.map(t => `
+                <li class="task" style="border-left:3px solid #8b5cf6;">
+                  <div class="task-body" style="cursor:default;">
+                    <div class="task-text">${escapeHtml(t.text)}</div>
+                    <div class="task-meta">
+                      <span class="badge" style="background:#f3e8ff;border-color:#c4b5fd;color:#6d28d9;">${escapeHtml(t.projectName)}</span>
+                      <span class="badge time-badge">${formatMins(t.estimate || 30)}</span>
+                      ${isWeekend(dateKey()) ? '<span class="badge" style="background:#dcfce7;border-color:#86efac;color:#166534;">Weekend</span>' : ''}
+                    </div>
+                  </div>
+                </li>
+              `).join('')}
+            </ul>
+            <p class="hint">Managed in the Projects section below · Mark complete there</p>
+          </section>`;
+      } else {
+        projBox.style.display = 'none';
+        projBox.innerHTML = '';
+      }
+
+      updateTotals();
+    }
+
+    // ========== Drag & Drop ==========
+    function handleDragStart(e) {
+      dragSrcEl = this;
+      dragSrcSection = this.dataset.section;
+      this.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', this.dataset.id);
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      return false;
+    }
+
+    function handleDragEnter(e) {
+      e.preventDefault();
+      if (this === dragSrcEl) return;
+      if (this.dataset.section !== dragSrcSection) return;
+      this.classList.add('drag-over');
+    }
+
+    function handleDragLeave() {
+      this.classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      this.classList.remove('drag-over');
+
+      if (dragSrcEl === this) return false;
+      if (this.dataset.section !== dragSrcSection) return false;
+
+      const section = dragSrcSection;
+      const data = getDayData();
+      const list = data[section];
+      const srcId = dragSrcEl.dataset.id;
+      const targetId = this.dataset.id;
+
+      const srcIndex = list.findIndex(t => t.id === srcId);
+      const targetIndex = list.findIndex(t => t.id === targetId);
+      if (srcIndex < 0 || targetIndex < 0) return false;
+
+      const [moved] = list.splice(srcIndex, 1);
+      list.splice(targetIndex, 0, moved);
+
+      saveDayData(data);
+      renderTasks();
+      return false;
+    }
+
+    function handleDragEnd() {
+      this.classList.remove('dragging');
+      document.querySelectorAll('.task').forEach(el => el.classList.remove('drag-over'));
+      dragSrcEl = null;
+      dragSrcSection = null;
+    }
+
+    function updateTotals() {
+      const data = getDayData();
+      const workRem = (data.work || []).filter(t => !t.completed).reduce((s, t) => s + (t.estimate || 0), 0);
+      const persRem = (data.personal || []).filter(t => !t.completed).reduce((s, t) => s + (t.estimate || 0), 0);
+      const total = workRem + persRem;
+
+      document.getElementById('workMins').textContent = formatMins(workRem);
+      document.getElementById('personalMins').textContent = formatMins(persRem);
+      document.getElementById('totalMins').textContent = formatMins(total);
+
+      const chip = document.getElementById('totalChip');
+      if (total > 390) chip.classList.add('over');
+      else chip.classList.remove('over');
+
+      const all = [...(data.work || []), ...(data.personal || []), ...(data.calendar || [])];
+      const done = all.filter(t => t.completed).length;
+      document.getElementById('progressText').textContent = `${done} of ${all.length} complete`;
+
+      const carried = all.filter(t => t.carried && !t.completed).length;
+      document.getElementById('carryNote').textContent = carried ? `${carried} carried from previous day` : '';
+    }
+
+    function setupEstimateButtons(rowId, customId, isWork) {
+      const row = document.getElementById(rowId);
+      const custom = document.getElementById(customId);
+
+      row.querySelectorAll('.est-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          row.querySelectorAll('.est-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          custom.value = '';
+          if (isWork) workSelectedEst = parseInt(btn.dataset.mins, 10);
+          else personalSelectedEst = parseInt(btn.dataset.mins, 10);
+        });
+      });
+
+      custom.addEventListener('input', () => {
+        const v = parseInt(custom.value, 10);
+        if (!isNaN(v) && v > 0) {
+          row.querySelectorAll('.est-btn').forEach(b => b.classList.remove('active'));
+          if (isWork) workSelectedEst = v;
+          else personalSelectedEst = v;
+        }
+      });
+    }
+
+    // ========== Actions ==========
+    function addTask(section) {
+      const input = document.getElementById(section + 'Input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const data = getDayData();
+      if (section === 'calendar') {
+        const timeEl = document.getElementById('calendarTime');
+        data.calendar.push({
+          id: uid(),
+          text,
+          completed: false,
+          carried: false,
+          source: 'outlook',
+          time: timeEl.value || '09:00',
+          estimate: 30,
+          created: Date.now()
+        });
+        // Keep calendar sorted by time
+        data.calendar.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+      } else {
+        const est = section === 'work' ? workSelectedEst : personalSelectedEst;
+        data[section].push({
+          id: uid(),
+          text,
+          completed: false,
+          carried: false,
+          priority: 'normal',
+          estimate: est || 30,
+          created: Date.now()
+        });
+      }
+      saveDayData(data);
+      input.value = '';
+      renderTasks();
+      showToast(section === 'calendar' ? 'Calendar item added' : `Added · ${formatMins(section === 'work' ? workSelectedEst : personalSelectedEst)}`);
+      input.focus();
+    }
+
+    // Parse pasted calendar events from iOS Shortcut
+    function parsePastedEvents() {
+      const raw = document.getElementById('pasteEvents').value.trim();
+      if (!raw) {
+        showToast('Nothing to paste');
+        return;
+      }
+
+      const lines = raw.split(/\n/).map(l => l.trim()).filter(Boolean);
+      const data = getDayData();
+      let added = 0;
+
+      const existing = new Set((data.calendar || []).map(t => (t.time || '') + '|' + t.text.toLowerCase()));
+
+      lines.forEach(line => {
+        // Supported formats:
+        // "9:00 AM - Client call"
+        // "9:00 AM – Client call"  (en-dash)
+        // "09:00 - Client call"
+        // "9:00am Client call"
+        // "Client call at 9:00 AM"
+        let time24 = null;
+        let title = line;
+
+        // Pattern: time at start
+        let m = line.match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?\s*[-–—:]?\s*(.+)$/);
+        if (m) {
+          let h = parseInt(m[1], 10);
+          const min = m[2];
+          const ap = (m[3] || '').toUpperCase();
+          if (ap === 'PM' && h < 12) h += 12;
+          if (ap === 'AM' && h === 12) h = 0;
+          // If no AM/PM and hour <= 7, assume PM for typical work day? Better leave as-is or assume 24h
+          if (!ap && h >= 1 && h <= 7) {
+            // Heuristic: early single-digit often means morning already, leave it
+          }
+          time24 = String(h).padStart(2, '0') + ':' + min;
+          title = m[4].trim();
+        } else {
+          // Pattern: "Title at 9:00 AM"
+          m = line.match(/^(.+?)\s+at\s+(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?$/i);
+          if (m) {
+            title = m[1].trim();
+            let h = parseInt(m[2], 10);
+            const min = m[3];
+            const ap = (m[4] || '').toUpperCase();
+            if (ap === 'PM' && h < 12) h += 12;
+            if (ap === 'AM' && h === 12) h = 0;
+            time24 = String(h).padStart(2, '0') + ':' + min;
+          }
+        }
+
+        if (!title) return;
+        if (!time24) time24 = '09:00';
+
+        const key = time24 + '|' + title.toLowerCase();
+        if (existing.has(key)) return; // skip duplicates
+
+        data.calendar.push({
+          id: uid(),
+          text: title,
+          completed: false,
+          carried: false,
+          source: 'outlook',
+          time: time24,
+          estimate: 30,
+          created: Date.now()
+        });
+        existing.add(key);
+        added++;
+      });
+
+      if (added === 0) {
+        showToast('No new events found (or all already added)');
+        return;
+      }
+
+      data.calendar.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+      saveDayData(data);
+      document.getElementById('pasteEvents').value = '';
+      renderTasks();
+      showToast(`Added ${added} calendar item${added > 1 ? 's' : ''}`);
+    }
+
+    function changeDay(delta) {
+      currentDate.setDate(currentDate.getDate() + delta);
+      formatDisplayDate(currentDate);
+      document.getElementById('schedulePanel').classList.remove('open');
+      renderTasks();
+    }
+
+    function goToday() {
+      currentDate = new Date();
+      currentDate.setHours(12, 0, 0, 0);
+      formatDisplayDate(currentDate);
+      document.getElementById('schedulePanel').classList.remove('open');
+      renderTasks();
+    }
+
+    function getPreviousDayKey() {
+      const prev = new Date(currentDate);
+      prev.setDate(prev.getDate() - 1);
+      return dateKey(prev);
+    }
+
+    function findCarryItems() {
+      const prevKey = getPreviousDayKey();
+      const all = loadAll();
+      const prev = all[prevKey];
+      if (!prev) return { work: [], personal: [], calendar: [] };
+      return {
+        work: (prev.work || []).filter(t => !t.completed),
+        personal: (prev.personal || []).filter(t => !t.completed),
+        calendar: (prev.calendar || []).filter(t => !t.completed)
+      };
+    }
+
+    function openPlanModal() {
+      const carry = findCarryItems();
+      const content = document.getElementById('carryContent');
+      const total = carry.work.length + carry.personal.length + carry.calendar.length;
+
+      if (total === 0) {
+        content.innerHTML = `<p style="color:var(--text-muted)">No unfinished items from yesterday. You are clear to plan fresh.</p>
+          <p style="margin-top:10px;font-size:0.9rem;">Tip: Add your 1–3 most important tasks first and give them realistic time estimates. Then press <strong>Build Schedule</strong>.</p>`;
+        document.getElementById('confirmCarryBtn').textContent = 'Start Day';
+      } else {
+        let html = `<p><strong>${total} unfinished item${total > 1 ? 's' : ''}</strong> from yesterday:</p><div class="carry-list">`;
+        carry.work.forEach(t => {
+          html += `<div class="carry-item"><span style="color:#1d4ed8;font-size:0.78rem;min-width:70px;">Work</span><span>${escapeHtml(t.text)}</span><span style="margin-left:auto;color:var(--text-muted);font-size:0.8rem;">${formatMins(t.estimate || 30)}</span></div>`;
+        });
+        carry.personal.forEach(t => {
+          html += `<div class="carry-item"><span style="color:#0369a1;font-size:0.78rem;min-width:70px;">Personal</span><span>${escapeHtml(t.text)}</span><span style="margin-left:auto;color:var(--text-muted);font-size:0.8rem;">${formatMins(t.estimate || 30)}</span></div>`;
+        });
+        carry.calendar.forEach(t => {
+          html += `<div class="carry-item"><span style="color:#4338ca;font-size:0.78rem;min-width:70px;">Calendar</span><span>${escapeHtml(t.text)}</span><span style="margin-left:auto;color:var(--text-muted);font-size:0.8rem;">${t.time ? formatTime12(t.time) : ''}</span></div>`;
+        });
+        html += `</div><p style="font-size:0.88rem;color:var(--text-muted)">These will be brought forward and marked “From yesterday.” Completed items from prior days have already been cleared.</p>`;
+        content.innerHTML = html;
+        document.getElementById('confirmCarryBtn').textContent = 'Bring Forward & Start';
+      }
+      document.getElementById('planModal').classList.add('open');
+    }
+
+    function confirmCarry() {
+      const carry = findCarryItems();
+      const data = getDayData();
+      const existingWork = new Set((data.work || []).map(t => t.text));
+      const existingPersonal = new Set((data.personal || []).map(t => t.text));
+      const existingCal = new Set((data.calendar || []).map(t => t.text + (t.time || '')));
+
+      carry.work.forEach(t => {
+        if (!existingWork.has(t.text)) {
+          data.work.push({
+            id: uid(), text: t.text, completed: false, carried: true,
+            priority: t.priority || 'normal', estimate: t.estimate || 30, created: Date.now()
+          });
+        }
+      });
+      carry.personal.forEach(t => {
+        if (!existingPersonal.has(t.text)) {
+          data.personal.push({
+            id: uid(), text: t.text, completed: false, carried: true,
+            priority: t.priority || 'normal', estimate: t.estimate || 30, created: Date.now()
+          });
+        }
+      });
+      carry.calendar.forEach(t => {
+        if (!existingCal.has(t.text + (t.time || ''))) {
+          data.calendar.push({
+            id: uid(), text: t.text, completed: false, carried: true,
+            source: 'outlook', time: t.time, estimate: 30, created: Date.now()
+          });
+        }
+      });
+      data.calendar.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+      data.planned = true;
+      saveDayData(data);
+      document.getElementById('planModal').classList.remove('open');
+      renderTasks();
+      showToast('Ready for the day');
+    }
+
+    function buildSchedule() {
+      const data = getDayData();
+      const workOpen = (data.work || []).filter(t => !t.completed).map(t => ({...t, section: 'work'}));
+      const personalOpen = (data.personal || []).filter(t => !t.completed).map(t => ({...t, section: 'personal'}));
+      const calOpen = (data.calendar || []).filter(t => !t.completed);
+
+      const bySizeThenOrder = [...workOpen].sort((a, b) => {
+        const diff = (b.estimate || 0) - (a.estimate || 0);
+        if (Math.abs(diff) > 15) return diff;
+        return 0;
+      });
+
+      const blocks = [
+        { id: 'deep', name: '8:30 – 11:00 · Deep work / MITs', capacity: 150, items: [], highlight: false, note: 'Peak cognitive capacity — put your hardest or highest-leverage work here.' },
+        { id: 'admin', name: '11:00 – 12:00 · Admin / batch', capacity: 60, items: [], highlight: false, note: 'Batch smaller work and administrative tasks.' },
+        { id: 'recovery', name: '12:45 – 1:15 · Read / Surf (protected)', capacity: 0, items: [], highlight: true, note: 'Intentional recovery. Do not schedule work here.' },
+        { id: 'afternoon', name: '1:15 – 3:45 · Client work / remaining', capacity: 150, items: [], highlight: false, note: 'Medium-focus window. Good for calls, follow-ups, and remaining substantive work.' },
+        { id: 'wrap', name: '3:45 – 4:15 · Wrap + tomorrow notes', capacity: 25, items: [], highlight: false, note: 'Close loops, update notes, prepare tomorrow’s top priorities.' },
+        { id: 'personal', name: 'After 4:30 · Personal & Home', capacity: 999, items: [], highlight: false, note: 'Protect the boundary. Only short urgent personal items earlier if truly necessary.' }
+      ];
+
+      let remaining = [...bySizeThenOrder];
+
+      let deepLeft = 150;
+      const deepTasks = [];
+      for (const t of remaining) {
+        if ((t.estimate || 30) <= deepLeft) {
+          deepTasks.push(t);
+          deepLeft -= (t.estimate || 30);
+        }
+      }
+      blocks[0].items = deepTasks;
+      remaining = remaining.filter(t => !deepTasks.includes(t));
+
+      remaining.sort((a, b) => (a.estimate || 30) - (b.estimate || 30));
+      let adminLeft = 60;
+      const adminTasks = [];
+      for (const t of remaining) {
+        if ((t.estimate || 30) <= adminLeft) {
+          adminTasks.push(t);
+          adminLeft -= (t.estimate || 30);
+        }
+      }
+      blocks[1].items = adminTasks;
+      remaining = remaining.filter(t => !adminTasks.includes(t));
+
+      blocks[3].items = remaining;
+      blocks[5].items = personalOpen;
+
+      const afternoonUsed = blocks[3].items.reduce((s, t) => s + (t.estimate || 30), 0);
+      const overflow = afternoonUsed > 150;
+
+      const container = document.getElementById('scheduleContent');
+      let html = '';
+
+      // Show calendar meetings first as fixed anchors
+      if (calOpen.length) {
+        html += `<div class="sched-block" style="border-color:var(--calendar)">
+          <h3 style="color:var(--calendar)">Calendar / Meetings (fixed)</h3>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:6px;">These are scheduled appointments — protect the time around them.</div>
+          <ul>`;
+        calOpen.forEach(t => {
+          html += `<li><span>${escapeHtml(t.text)}</span><span class="mins">${t.time ? formatTime12(t.time) : ''}</span></li>`;
+        });
+        html += `</ul></div>`;
+      }
+
+      blocks.forEach(b => {
+        const used = b.items.reduce((s, t) => s + (t.estimate || 0), 0);
+        html += `<div class="sched-block ${b.highlight ? 'highlight' : ''}">
+          <h3>${b.name}</h3>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:6px;">${b.note}</div>`;
+        if (b.items.length === 0) {
+          html += `<div class="sched-empty">${b.id === 'recovery' ? 'Protected — keep this free' : '— open —'}</div>`;
+        } else {
+          html += '<ul>';
+          b.items.forEach(t => {
+            const flag = t.carried ? ' · from yesterday' : '';
+            html += `<li><span>${escapeHtml(t.text)}${flag}</span><span class="mins">${formatMins(t.estimate)}</span></li>`;
+          });
+          html += '</ul>';
+          if (b.capacity < 900) {
+            html += `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px;">${formatMins(used)} of ${formatMins(b.capacity)}</div>`;
+          }
+        }
+        html += '</div>';
+      });
+
+      if (overflow) {
+        html += `<div class="overflow-warning">
+          Afternoon block is overloaded by ~${formatMins(afternoonUsed - 150)}.
+          Consider moving lower-priority items to tomorrow or shortening estimates.
+          Protecting the 4:20 hard stop is more valuable than finishing everything.
+        </div>`;
+      }
+
+      const totalWork = workOpen.reduce((s, t) => s + (t.estimate || 0), 0);
+      html += `<div style="margin-top:14px;font-size:0.88rem;color:var(--text-muted);">
+        Total incomplete Work time: <strong style="color:var(--text)">${formatMins(totalWork)}</strong>.
+        Available focused capacity before hard stop ≈ 6 hours.
+      </div>`;
+
+      container.innerHTML = html;
+      document.getElementById('schedulePanel').classList.add('open');
+      document.getElementById('schedulePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      showToast('Schedule built');
+    }
+
+    function emailPlan() {
+      const data = getDayData();
+      const d = currentDate;
+      const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      const dateStr = `${weekdays[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+
+      const workRem = (data.work || []).filter(t => !t.completed).reduce((s, t) => s + (t.estimate || 0), 0);
+      const persRem = (data.personal || []).filter(t => !t.completed).reduce((s, t) => s + (t.estimate || 0), 0);
+
+      let body = `DAILY PLAN — ${dateStr}\n`;
+      body += `========================================\n`;
+      body += `Work remaining: ${formatMins(workRem)}   |   Personal remaining: ${formatMins(persRem)}\n\n`;
+
+      body += `ENERGY-OPTIMIZED STRUCTURE\n`;
+      body += `• Arrival – 8:30     Plan + light inbox\n`;
+      body += `• 8:30 – 11:00       Deep work / MITs          (peak focus · 150 min)\n`;
+      body += `• 11:00 – 12:00      Admin / batch             (60 min)\n`;
+      body += `• 12:00 – 12:45      Lunch\n`;
+      body += `• 12:45 – 1:15       Read / Surf (protected)   (recharge)\n`;
+      body += `• 1:15 – 3:45        Client work / remaining   (150 min)\n`;
+      body += `• 3:45 – 4:15        Wrap + tomorrow notes\n`;
+      body += `• 4:20               Hard stop → Leave\n\n`;
+
+      if ((data.calendar || []).length) {
+        body += `----------------------------------------\n`;
+        body += `CALENDAR / MEETINGS (Outlook)\n`;
+        body += `----------------------------------------\n`;
+        data.calendar.forEach(t => {
+          const mark = t.completed ? '[x]' : '[ ]';
+          const tm = t.time ? formatTime12(t.time) + '  ' : '';
+          body += `${mark} ${tm}${t.text}\n`;
+        });
+        body += `\n`;
+      }
+
+      body += `----------------------------------------\n`;
+      body += `WORK & ADMIN\n`;
+      body += `----------------------------------------\n`;
+      if (!(data.work || []).length) body += `(none)\n`;
+      else {
+        data.work.forEach(t => {
+          const mark = t.completed ? '[x]' : '[ ]';
+          const flag = t.carried ? ' (from yesterday)' : '';
+          const est = t.estimate ? `  [${formatMins(t.estimate)}]` : '';
+          body += `${mark} ${t.text}${flag}${est}\n`;
+        });
+      }
+
+      body += `\n----------------------------------------\n`;
+      body += `PERSONAL & HOME\n`;
+      body += `----------------------------------------\n`;
+      if (!(data.personal || []).length) body += `(none)\n`;
+      else {
+        data.personal.forEach(t => {
+          const mark = t.completed ? '[x]' : '[ ]';
+          const flag = t.carried ? ' (from yesterday)' : '';
+          const est = t.estimate ? `  [${formatMins(t.estimate)}]` : '';
+          body += `${mark} ${t.text}${flag}${est}\n`;
+        });
+      }
+
+      body += `\n========================================\n`;
+      body += `Generated from Daily Planner\n`;
+
+      const subject = encodeURIComponent(`Daily Plan — ${dateStr}`);
+      const mailto = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
+
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(body).then(() => showToast('Plan copied + email ready')).catch(() => {});
+      }
+      window.location.href = mailto;
+    }
+
+    // ========== Event listeners ==========
+    document.getElementById('prevDay').addEventListener('click', () => changeDay(-1));
+    document.getElementById('nextDay').addEventListener('click', () => changeDay(1));
+    document.getElementById('todayBtn').addEventListener('click', goToday);
+    document.getElementById('planDayBtn').addEventListener('click', openPlanModal);
+    document.getElementById('scheduleBtn').addEventListener('click', buildSchedule);
+    document.getElementById('emailBtn').addEventListener('click', emailPlan);
+    document.getElementById('closePlanBtn').addEventListener('click', () => {
+      document.getElementById('planModal').classList.remove('open');
+    });
+    document.getElementById('confirmCarryBtn').addEventListener('click', confirmCarry);
+
+    document.getElementById('workAddBtn').addEventListener('click', () => addTask('work'));
+    document.getElementById('personalAddBtn').addEventListener('click', () => addTask('personal'));
+    document.getElementById('calendarAddBtn').addEventListener('click', () => addTask('calendar'));
+    document.getElementById('parsePasteBtn').addEventListener('click', parsePastedEvents);
+
+    document.getElementById('workInput').addEventListener('keydown', e => { if (e.key === 'Enter') addTask('work'); });
+    document.getElementById('personalInput').addEventListener('keydown', e => { if (e.key === 'Enter') addTask('personal'); });
+    document.getElementById('calendarInput').addEventListener('keydown', e => { if (e.key === 'Enter') addTask('calendar'); });
+
+    // Add project
+    document.getElementById('projectAddBtn').addEventListener('click', () => {
+      const name = document.getElementById('projectNameInput').value.trim();
+      const deadline = document.getElementById('projectDeadlineInput').value;
+      if (!name) {
+        showToast('Enter a project name');
+        return;
+      }
+      const projects = loadProjects();
+      projects.push({
+        id: uid(),
+        name,
+        deadline: deadline || null,
+        tasks: []
+      });
+      saveProjects(projects);
+      document.getElementById('projectNameInput').value = '';
+      document.getElementById('projectDeadlineInput').value = '';
+      renderProjects();
+      showToast('Project created — add tasks below');
+    });
+    document.getElementById('projectNameInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('projectAddBtn').click();
+    });
+
+    document.getElementById('planModal').addEventListener('click', e => {
+      if (e.target.id === 'planModal') document.getElementById('planModal').classList.remove('open');
+    });
+
+    setupEstimateButtons('workEstRow', 'workCustomEst', true);
+    setupEstimateButtons('personalEstRow', 'personalCustomEst', false);
+
+    // ========== Init ==========
+    // 1. Always start local and usable
+    currentDate = new Date();
+    currentDate.setHours(12, 0, 0, 0);
+    formatDisplayDate(currentDate);
+    updateClock();
+    const rolled = performDayRollover();
+    renderTasks();
+    renderProjects();
+    if (rolled) showToast('New day — completed items from prior days cleared');
+    else showToast('Ready');
+
+    // 2. Cloud in the background (never blocks the UI)
+    setTimeout(async () => {
+      initSupabase();
+      if (!supabaseClient) return;
+      try {
+        const got = await pullFromCloud();
+        if (got) {
+          renderTasks();
+          renderProjects();
+          showToast('Synced from other devices');
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    }, 500);
+
+    // Live clock
+    setInterval(updateClock, 30000);
+
+    // Sync button
+    const syncBtn = document.getElementById('syncBtn');
+    if (syncBtn) {
+      syncBtn.addEventListener('click', () => {
+        initSupabase();
+        manualSync();
+      });
+    }
+  </script>
+</body>
+</html>
